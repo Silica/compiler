@@ -1,0 +1,684 @@
+if (!arg[1])
+	return print("error : no input file\n");
+file f.open(arg[1]);
+if (!f.name)
+	return print("error : fileopen error\n");
+string source = f.read(1048576);
+
+array lines = strlib.split(source, "\n");
+
+local functions;
+string current_f;
+
+lines.foreach($(string x){
+	array token = strlib.split(x, " ");
+	if (token[0] == "function")		parse_function(token, functions, current_f);
+	else if (token[0] == "var")		parse_var(token, functions[current_f]);
+	else if (token[0] == "if")		parse_if(token, functions[current_f]);
+	else if (token[0] == "label")	parse_label(token, functions[current_f]);
+	else if (token[0] == "putchar")	parse_putchar(token, functions[current_f]);
+	else if (token[0] == "getchar")	parse_getchar(token, functions[current_f]);
+	else if (token[0] == "call")	parse_call(token, functions[current_f]);
+	else if (token[0] == "return")	parse_return(token, functions[current_f]);
+	else							parse_expression(token, functions[current_f]);
+});
+
+parse_function(ref token, ref functions, ref c)
+{
+	*c = token[1];
+	if (table.exist(functions, token[1]))
+		return print("error : function "+token[1]+" is already exist\n");
+	ref f = functions[token[1]];
+	f.varnum = 0;
+	f.argnum = 0;
+	int a = f.argnum;
+	if (token.length() > 2)
+	{
+		f.arg.num = token.length();
+		for (int i = 2; i < token.length(); i++)
+		{
+			f.arg[i-2] = token[i];
+			f.var[token[i]] = 1 + ++f.argnum;
+		}
+	}
+}
+
+parse_var(ref token, ref f)
+{
+	for (int i = 1; i < token.length(); i++)
+	{
+		f.var[token[i]] = -++f.varnum;
+	}
+}
+
+parse_if(ref token, ref f)
+{
+	int line = array.length(f);
+
+	if (token.length() > 4)
+	{
+		check_var(f[line].var[0], token[1], f);
+		check_var(f[line].var[1], token[3], f);
+		f[line].label = token[5];
+		if (token[2] == "<")		f[line].type = "lt";
+		else if (token[2] == ">")	f[line].type = "gt";
+		else if (token[2] == "<=")	f[line].type = "le";
+		else if (token[2] == ">=")	f[line].type = "ge";
+		else if (token[2]/1 == "!")	f[line].type = "ne";
+		else if (token[2]/1 == "=")	f[line].type = "eq";
+	}
+	else
+	{
+		check_var(f[line].var[0], token[1], f);
+		f[line].label = token[3];
+		f[line].type = "if_b";
+	}
+}
+
+parse_label(ref token, ref f)
+{
+	int line = array.length(f);
+	f.label[token[1]] = line;
+}
+
+parse_putchar(ref token, ref f)
+{
+	int line = array.length(f);
+	f[line].type = "putchar";
+	check_var(f[line].var, token[1], f);
+}
+
+parse_getchar(ref token, ref f)
+{
+	int line = array.length(f);
+	f[line].type = "getchar";
+	check_var(f[line].var, token[1], f);
+}
+
+parse_call(ref token, ref f)
+{
+	int line = array.length(f);
+
+	if (token.length() > 2 && token[2] == "=")
+	{
+		f[line].type = "rcall";
+		f[line].name = token[3];
+		f[line].args = token.length() - 4;
+		check_var(f[line].ret, token[1], f);
+
+		for (int i = 4; i < token.length(); i++)
+			check_var(f[line].arg[i-4], token[i], f);
+	}
+	else
+	{
+		f[line].type = "call";
+		f[line].name = token[1];
+		f[line].args = token.length() - 2;
+		for (int i = 2; i < token.length(); i++)
+			check_var(f[line].arg[i-2], token[i], f);
+	}
+}
+
+parse_return(ref token, ref f)
+{
+	int line = array.length(f);
+	if (token.length() > 1)
+	{
+		check_var(f[line].var, token[1], f);
+		f[line].type = "vret";
+	}
+	else
+	{
+		f[line].type = "ret";
+	}
+}
+
+parse_expression(ref token, ref f)
+{
+	if (token.length() < 3)
+		return;
+	int line = array.length(f);
+
+	check_var(f[line].var[0], token[0], f);
+	check_var(f[line].var[1], token[2], f);
+	if (token.length() > 3)
+	{
+		check_var(f[line].var[2], token[4], f);
+		if (token[3] == "+")		f[line].type = "add";
+		else if (token[3] == "-")	f[line].type = "sub";
+		else if (token[3] == "*")	f[line].type = "mul";
+		else if (token[3] == "/")	f[line].type = "div";
+		else if (token[3] == "%")	f[line].type = "mod";
+		else return print("error : unknown operator "+token[3]+"\n")
+	}
+	else
+	{
+		f[line].type = "mov";
+	}
+}
+
+check_var(ref a, string s, ref f)
+{
+	int n = s;
+	if (n || s/1 == "0")
+	{
+		a.type = "num";
+		a.num = n;
+	}
+	else
+	{
+		if (!table.exist(f.var, s))
+			return print("error : var "+s+" is not defined\n");
+		a.type = "var";
+		a.num = f.var[s];
+	}
+}
+
+operandsize(ref v)
+{
+	if (v.type == "var")
+	{
+		if (v.num > 0 && v.num < 32)
+			return 3;
+		if (v.num < 0 && v.num >= -32)
+			return 3;
+		return 6;
+	}
+	else
+		return 5;
+}
+
+codesize
+{
+	int i;
+	mov(ref x)
+	{
+		int c = operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		x.codesize = c;
+	}
+
+	add(ref x)
+	{
+		int c = 2;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		c += operandsize(x.var[2]);
+		x.codesize = c;
+	}
+	sub(ref x)
+	{
+		int c = 2;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		c += operandsize(x.var[2]);
+		x.codesize = c;
+	}
+	mul(ref x)
+	{
+		int c = 2;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		c += operandsize(x.var[2]);
+		x.codesize = c;
+	}
+	div(ref x)
+	{
+		int c = 4;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		c += operandsize(x.var[2]);
+		x.codesize = c;
+	}
+	mod(ref x)
+	{
+		int c = 4;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		c += operandsize(x.var[2]);
+		x.codesize = c;
+	}
+
+	if_b(ref x)
+	{
+		int c = 8;
+		c += operandsize(x.var[0]);
+		x.codesize = c;
+	}
+	eq(ref x)
+	{
+		int c = 8;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		x.codesize = c;
+	}
+	ne(ref x)
+	{
+		int c = 8;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		x.codesize = c;
+	}
+	lt(ref x)
+	{
+		int c = 8;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		x.codesize = c;
+	}
+	gt(ref x)
+	{
+		int c = 8;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		x.codesize = c;
+	}
+	le(ref x)
+	{
+		int c = 8;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		x.codesize = c;
+	}
+	ge(ref x)
+	{
+		int c = 8;
+		c += operandsize(x.var[0]);
+		c += operandsize(x.var[1]);
+		x.codesize = c;
+	}
+
+	putchar(ref x)
+	{
+		int c = 7;
+		c += operandsize(x.var);
+		x.codesize = c;
+	}
+	getchar(ref x)
+	{
+		int c = 6;
+		c += operandsize(x.var);
+		x.codesize = c;
+	}
+
+	call(ref x)
+	{
+		int c = 5;
+		for (int i = 0; i < x.args; i++)
+			c += operandsize(x.arg[i]);
+		x.calloffset = c;
+		if (x.args > 31)	c += 6;
+		else if (x.args)	c += 3;
+		x.codesize = c;
+	}
+	rcall(ref x)
+	{
+		codesize.call(x);
+		x.codesize += operandsize(x.ret);
+	}
+	vret(ref x)
+	{
+		int c = 5;
+		c += operandsize(x.var);
+		x.codesize = c;
+	}
+	ret(ref x)
+	{
+		x.codesize = 5;
+	}
+}
+
+table.foreach(functions, (string k,ref v){
+	int size = array.length(v);
+	int c = 3;	// push ebp;mov ebp,esp
+	if (v.varnum > 31)		c += 6;
+	else if (v.varnum > 0)	c += 3;
+	for (int i = 0; i < size; i++)
+	{
+		v.offset[i] = c;
+		c += codesize[v[i].type](v[i]);
+	}
+	v.offset[size] = c;
+	if (v.varnum > 31)		c += 6;
+	else if (v.varnum > 0)	c += 3;
+	c += 2;	// pop ebp;retn
+	v.codesize = c;
+});
+
+hex address = 0;
+functions.main.address = address;
+address += functions.main.codesize;
+
+table.foreach(functions, $(string k,ref v){
+	if (k == "main")
+		return;
+	v.address = address;
+	address += v.codesize;
+});
+
+assembler asm.resize(address);
+table.foreach(functions, $(string k,ref v){
+	int size = array.length(v);
+	asm.set(v.address);
+	asm.begin(v.varnum);
+	for (int i = 0; i < size; i++)
+		asm[v[i].type](v[i], i, v, functions);
+	asm.end(v.varnum);
+});
+
+assembler
+{
+	binarystring bin = new_binarystring();
+	resize(hex size)	bin.resize(size);
+	set(hex address)	bin.set(address);
+
+	#define B bin.write_byte`
+	#define W bin.write_word`
+	#define D bin.write_dword`
+
+	mov_eax(ref v)
+	{
+		if (v.type == "num")
+		{
+			//mov eax,v.num
+			B 0xB8;
+			D v.num;
+		}
+		else
+		{
+			int s = operandsize(v);
+			if (s == 3)
+			{
+				//mov eax,[ebp+v.num*4]
+				W 0x458B;
+				B v.num*4;
+			}
+			else
+			{
+				//mov eax,[ebp+v.num*4]
+				W 0x858B;
+				D v.num*4;
+			}
+		}
+	}
+
+	mov_ecx(ref v)
+	{
+		if (v.type == "num")
+		{
+			//mov ecx,v.num
+			B 0xB9;
+			D v.num;
+		}
+		else
+		{
+			int s = operandsize(v);
+			if (s == 3)
+			{
+				//mov ecx,[ebp+v.num*4]
+				W 0x4D8B;
+				B v.num*4;
+			}
+			else
+			{
+				//mov ecx,[ebp+v.num*4]
+				W 0x8D8B;
+				D v.num*4;
+			}
+		}
+	}
+
+	mov_stack(ref v)
+	{
+		if (v.type == "num")
+			return print("error : mov to number.\n");
+		int s = operandsize(v);
+		if (s == 3)
+		{
+			//mov [ebp-v.num*4],eax
+			W 0x4589;
+			B v.num*4;
+		}
+		else
+		{
+			//mov [ebp+v.num*4],eax
+			W 0x8589;
+			D v.num*4;
+		}
+	}
+	mov_stack_edx(ref v)
+	{
+		if (v.type == "num")
+			return print("error : mov to number.\n");
+		int s = operandsize(v);
+		if (s == 3)
+		{
+			//mov [ebp-v.num*4],edx
+			W 0x5589;
+			B v.num*4;
+		}
+		else
+		{
+			//mov [ebp+v.num*4],edx
+			W 0x9589;
+			D v.num*4;
+		}
+	}
+	push_var(ref v)
+	{
+		if (v.type == "num")
+		{
+			B 0x68;
+			D v.num;
+		}
+		else
+		{
+			int s = operandsize(v);
+			if (s == 3)
+			{
+				W 0x75FF;
+				B v.num*4;
+			}
+			else
+			{
+				W 0xB5FF;
+				D v.num*4;
+			}
+		}
+	}
+	add_esp(int v)
+	{
+		if (v > 31)
+		{
+			W 0xC481;
+			D v*4;
+		}
+		else if (v > 0)
+		{
+			W 0xC483;
+			B v*4;
+		}
+	}
+
+	begin(int v)
+	{
+		B 0x55;	// push ebp
+		W 0xEC8B;	// mov ebp,esp
+		if (v > 31)
+		{
+			W 0xEC81;
+			D v*4;
+		}
+		else if (v > 0)
+		{
+			W 0xEC83;
+			B v*4;
+		}
+	}
+	end(int v)
+	{
+		add_esp(v);
+		B 0x5D;	// pop ebp
+		B 0xC3;	// retn
+	}
+
+	mov(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[1]);
+		mov_stack(x.var[0]);
+	}
+	add(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[1]);
+		mov_ecx(x.var[2]);
+		W 0xC103;	// add eax,ecx
+		mov_stack(x.var[0]);
+	}
+	sub(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[1]);
+		mov_ecx(x.var[2]);
+		W 0xC12B;	// sub eax,ecx
+		mov_stack(x.var[0]);
+	}
+	mul(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[1]);
+		mov_ecx(x.var[2]);
+		W 0xE1F7;	// mul ecx
+		mov_stack(x.var[0]);
+	}
+	div(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[1]);
+		mov_ecx(x.var[2]);
+		W 0xD233;	// xor edx,edx
+		W 0xF1F7;	// div ecx
+		mov_stack(x.var[0]);
+	}
+	mod(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[1]);
+		mov_ecx(x.var[2]);
+		W 0xD233;	// xor edx,edx
+		W 0xF1F7;	// div ecx
+		mov_stack_edx(x.var[0]);
+	}
+
+	if_b(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[0]);
+		W 0xC085;	// test eax,eax
+		int to = f.label[x.label];
+		W 0x850F;	// jnz
+		D f.offset[to] - f.offset[i+1];
+	}
+	eq(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[0]);
+		mov_ecx(x.var[1]);
+		W 0xC13B;	// cmp eax,ecx
+		int to = f.label[x.label];
+		W 0x840F;	// je
+		D f.offset[to] - f.offset[i+1];
+	}
+	ne(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[0]);
+		mov_ecx(x.var[1]);
+		W 0xC13B;	// cmp eax,ecx
+		int to = f.label[x.label];
+		W 0x850F;	// jnz
+		D f.offset[to] - f.offset[i+1];
+	}
+	lt(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[0]);
+		mov_ecx(x.var[1]);
+		W 0xC13B;	// cmp eax,ecx
+		int to = f.label[x.label];
+		W 0x820F;	// jb
+		D f.offset[to] - f.offset[i+1];
+	}
+	gt(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[0]);
+		mov_ecx(x.var[1]);
+		W 0xC13B;	// cmp eax,ecx
+		int to = f.label[x.label];
+		W 0x870F;	// ja
+		D f.offset[to] - f.offset[i+1];
+	}
+	le(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[0]);
+		mov_ecx(x.var[1]);
+		W 0xC13B;	// cmp eax,ecx
+		int to = f.label[x.label];
+		W 0x860F;	// jbe
+		D f.offset[to] - f.offset[i+1];
+	}
+	ge(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var[0]);
+		mov_ecx(x.var[1]);
+		W 0xC13B;	// cmp eax,ecx
+		int to = f.label[x.label];
+		W 0x830F;	// jnb
+		D f.offset[to] - f.offset[i+1];
+	}
+
+	putchar(ref x, int i, ref f, ref fs)
+	{
+		push_var(x.var);
+		W 0x15FF;	// call
+		D lib.putchar;
+		B 0x58;	// pop eax
+	}
+	getchar(ref x, int i, ref f, ref fs)
+	{
+		W 0x15FF;	// call
+		D lib.getchar;
+		mov_stack(x.var);
+	}
+
+	call(ref x, int i, ref f, ref fs)
+	{
+		if (!table.exist(fs, x.name))
+			return print("error : function "+x.name+" is not defined\n");
+		if (fs[x.name].argnum != x.args)
+			return print("error : invalid number of argument when call "+x.name+"\n");
+
+		for (int i = 0; i < x.args; i++)
+			push_var(x.arg[i]);
+
+		B 0xE8;
+		D fs[x.name].address - f.address - f.offset[i] - x.calloffset;
+		add_esp(x.args);
+	}
+	rcall(ref x, int i, ref f, ref fs)
+	{
+		call(x, i, f, fs);
+		mov_stack(x.ret);
+	}
+
+	vret(ref x, int i, ref f, ref fs)
+	{
+		mov_eax(x.var);
+		ret(x, i, f, fs);
+	}
+	ret(ref x, int i, ref f, ref fs)
+	{
+		B 0xE9;
+		int size = array.length(f);
+		D f.offset[size] - f.offset[i+1];
+	}
+
+	#undef B
+	#undef W
+	#undef D
+}
+
+string filename = arg[2] || arg[1] + ".exe";
+write_exe(filename, asm.bin[0]);
+return 0;

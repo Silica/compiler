@@ -1,0 +1,74 @@
+function main
+var r
+call r = fib 30
+call print r
+
+function fib n
+var a b c
+if n < 2 goto end
+a = n - 1
+call a = fib a
+b = n - 2
+call b = fib b
+n = a + b
+label end
+return n
+
+function print n
+var a
+if n < 1000000000 goto n1000000000
+a = n / 1000000000
+a = a + 48
+putchar a
+label n1000000000
+if n < 100000000 goto n100000000
+a = n / 100000000
+a = a % 10
+a = a + 48
+putchar a
+label n100000000
+if n < 10000000 goto n10000000
+a = n / 10000000
+a = a % 10
+a = a + 48
+putchar a
+label n10000000
+if n < 1000000 goto n1000000
+a = n / 1000000
+a = a % 10
+a = a + 48
+putchar a
+label n1000000
+if n < 100000 goto n100000
+a = n / 100000
+a = a % 10
+a = a + 48
+putchar a
+label n100000
+if n < 10000 goto n10000
+a = n / 10000
+a = a % 10
+a = a + 48
+putchar a
+label n10000
+if n < 1000 goto n1000
+a = n / 1000
+a = a % 10
+a = a + 48
+putchar a
+label n1000
+if n < 100 goto n100
+a = n / 100
+a = a % 10
+a = a + 48
+putchar a
+label n100
+if n < 10 goto n10
+a = n / 10
+a = a % 10
+a = a + 48
+putchar a
+label n10
+a = n % 10
+a = a + 48
+putchar a

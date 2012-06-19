@@ -1,0 +1,93 @@
+PSLの力を示す為のベーシックな言語のネイティブコンパイラ
+
+使い方
+1.適当なC++コンパイラでPSLcをコンパイルする
+>cl /Ox /GLR- PSLc.cpp
+とかやればいいです
+
+2.PSLcでcompiler.pslをコンパイルする
+>PSLc.exe compiler.psl
+またはエクスプローラ上で投げるだけでもいいです
+PSLcはargv[0]を見て自分をコピーするので
+>pslc compiler.psl
+とかやると駄目かもしれないことが知られています
+
+3.出来たcompiler.exeにソースを投げる
+
+
+言語仕様
+スペースがなかったり余計なスペースが入ったりすると動きません
+
+変数は数値のみ
+標準関数はputcharとgetcharのみ
+
+コンパイルエラーが出ても止まらないので壊れたexeが出来ます
+触らない様に
+
+予約語
+function
+var
+if
+label
+putchar
+getchar
+call
+return
+
+各構文
+
+function name
+で関数定義
+またmain関数がエントリーポイントです
+function name arg1 arg2 arg3
+ってすると引数
+
+var a b c
+で変数宣言
+
+if x goto label
+if x == y goto label
+if x != y goto label
+if x < y goto label
+if x > y goto label
+if x <= y goto label
+if x >= y goto label
+で条件が真の時ジャンプ
+各項は変数でも数値でもいい
+因みに実はgotoとか見てないからそこ何でもいい
+実は==は=でもいいし!=は!でもいい
+
+label name
+でラベル
+
+putchar a
+でputchar
+これも変数でも数値でもいい
+
+getchar a
+でgetchar
+
+call funcname arg1 arg2
+call ret = funcname arg1 arg2
+で関数呼び出し
+引数の数はコンパイル時にチェックする
+がコンパイルエラーが出てもコンパイルは止まらない
+これも変数でも数値でもいい
+
+return
+retrurn a
+これも変数でも数値でもいい
+値を返さない関数を呼び出して値を受け取ろうとした場合は
+最後の式の結果が返る
+EAXだから
+
+その他の式
+a = b
+a = a + b
+a = a - b
+a = a * b
+a = a / b
+a = a % b
+=の右側にあるのは変数でも数値でもいい
+未宣言の変数はエラーになるが
+エラーがあってもコンパイルは止まらない
