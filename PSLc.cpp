@@ -82,9 +82,9 @@ void zero(FILE *fp, int n)
 		fputc(0, fp);
 }
 
-void write_exe(string filename, std::vector<unsigned char> *bin)
+void write_exe(string filename, binarystring *bin)
 {
-	size_t codesize = bin->size();
+	size_t codesize = bin->bin.size();
 	size_t filesize = (codesize + 0x1FF)/0x200*0x200;
 	size_t imagesize = (filesize + 0xFFF)/0x1000*0x1000;
 	const char dos[] = {0x0E,0x1F,0xBA,0x0E,0x00,0xB4,0x09,0xCD,0x21,0xB8,0x01,0x4C,0xCD,0x21,0x44,0x4F,0x53,0x0D,0x0D,0x0A,0x24};
@@ -152,9 +152,9 @@ void write_exe(string filename, std::vector<unsigned char> *bin)
 		}
 
 		fseek(fp, 0x200, SEEK_SET);
-		for (int i = 0; i < bin->size(); i++)
+		for (int i = 0; i < bin->bin.size(); i++)
 		{
-			fputc((*bin)[i], fp);
+			fputc(bin->bin[i], fp);
 		}
 
 		if (codesize < filesize)
